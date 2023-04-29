@@ -20,7 +20,7 @@ an important factor when evaluating a automobile. This paper aims to determines
 if the transmission type (automatic or manual) plays a significant role in an
 automobiles fuel efficiency, measured in miles per gallon (mpg).
 
-# Methods
+# Methods/Results
 
 ## The Data
 
@@ -61,18 +61,24 @@ mtcars <- mutate(mtcars, fcyl = factor(cyl), fam = factor(am), fgear = factor(ge
 ## Model Selection
 
 It seems reasonable to assume that horsepower is closely related to 1/4 mile 
-time, number of carburetors, and number of cylinders. In order to not overfit 
-the model, we will 
+time, number of carburetors, and number of cylinders. In order to not over fit 
+the model, we will use and ANOVA test to determine which of these variables to 
+include in the regression.
+
+```{r}
+mdl0 <- lm(mpg ~ fam, data = mtcars)
+mdl1 <- lm(mpg ~ fam + hp, data = mtcars)
+mdl2 <- lm(mpg ~ fam + hp + fcarb, data = mtcars)
+mdl3 <- lm(mpg ~ fam + hp + fcarb + fcyl, data = mtcars)
+mdl4 <- lm(mpg ~ fam + hp + fcarb + fcyl + qsec, data = mtcars)
+
+anova(mdl0, mdl1, mdl2, mdl3, mdl4)
+```
+Additionally, it seems reasonable to conclude that 
+
 
 ## Regression
 
-
-
-# Results
-
-## ANOVA
-
-## Regression
 
 
 # Discussion
