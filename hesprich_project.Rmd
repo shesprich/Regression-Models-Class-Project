@@ -3,6 +3,7 @@ title: "Class Project"
 author: "Shane Hesprich"
 date: "2023-04-28"
 output: pdf_document
+bibliography: citations.bib
 ---
 
 ```{r setup, include=FALSE}
@@ -11,7 +12,14 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Executive Summary
 
-
+This document investigates whether cars with automatic or manual transmissions 
+have a lower mpg. A quick exploratory analysis showed automatic having a lower 
+mpg than manual (17.15 mpg vs. 24.40mpg, p < 0.01). However, after removing 
+unnecessary variables to avoid overfit and a single outlier, a multivariate 
+linear regression was performed. This model showed a 1.84 mpg decrease in mpg 
+when going from manual to automatic. However, this value was not significant 
+(p = 0.35). Based on these results we cannot conclude that transmission type 
+has a significant impact on mpg.
 
 # Introduction
 
@@ -51,12 +59,41 @@ the included `R` data set `mtcars`. From `?mtcars` the data set is described as:
 >
 > [,11]	carb	Number of carburetors
 
-```{r}
-library(dplyr)
+## Exploratory Analysis
+
+First let's load the data and do some simple plots and statistics to get a feel 
+for the data. 
+```{r, fig.height=3.5,fig.width=6, message=FALSE}
 data(mtcars)
+library(dplyr)
+library(ggplot2)
 # Convert cyl, am, gear, and carb to factor vars
-mtcars <- mutate(mtcars, fcyl = factor(cyl), fam = factor(am), fgear = factor(gear), fcarb = factor(carb))
+mtcars <- mutate(mtcars, fcyl = factor(cyl), fam = factor(am), 
+                 fgear = factor(gear), fcarb = factor(carb), fvs = factor(vs))
+
+g <- ggplot(mtcars, aes(x = fam, y = mpg))
+g <- g + geom_boxplot()
+g
 ```
+As we can see here, it appears as if automatic transmission (```fam = 0```) has a 
+considerably lower median mpg. Let's see if a t-test corroborates what we see 
+in the above plot.
+
+```{r}
+automatic <- mtcars %>% 
+  filter(am == 0) %>%
+  select(mpg)
+manual <- mtcars %>% 
+  filter(am == 1) %>%
+  select(mpg)
+
+t.test(manual$mpg, automatic$mpg, alternative = "greater", 
+       conf.level = 0.95, paired=FALSE)
+```
+According to the above t test, manual transmissions have a statistically 
+significantly higher mpg than automatic transmissions. Now let's look at a 
+linear regression that controls for the other 9 variables and see if this 
+observation holds true.
 
 ## Model Selection
 
@@ -74,15 +111,64 @@ mdl4 <- lm(mpg ~ fam + hp + fcarb + fcyl + qsec, data = mtcars)
 
 anova(mdl0, mdl1, mdl2, mdl3, mdl4)
 ```
-Additionally, it seems reasonable to conclude that 
-
 
 ## Regression
 
+Let's perform a regression on the remaining variables.
 
+```{r}
+fit <- lm(mpg ~ fam + disp + hp + drat + wt + fvs + gear, data = mtcars)
+```
 
-# Discussion
+## Model evaluation
 
+Before discussing the results of the model, let us first evaluate the model to 
+ensure it is a good fit. First we will check the residuals.
 
+```{r}
+par(mfrow = c(2, 2))
+plot(fit)
+```
+Next we will look for any outliers. This will be done by looking at the dfbetas 
+and hatvalues of our data. According to @belsley2005regression we are looking 
+for a $|dfbeta| > \frac{2}{\sqrt{n}}$ and $hatvalue > 2*\left(\frac{n}{p}\right)$, where $n$ is 
+the number of samples, and $p$ is the number of estimated parameters. In our 
+case $n = 32$ and $p = 8$.
 
-# Conclusion
+```{r}
+n <- dim(mtcars)[1]
+p <- 8
+dfthresh <- 2/sqrt(n)
+hvthresh <- 2*(p/n)
+dfbs <- as.data.frame(dfbetas(fit))
+dfbs <- dfbs %>% 
+  mutate(hv = hatvalues(fit)) %>% 
+  filter(if_any('(Intercept)':gear, ~ abs(.) > dfthresh)) %>% 
+  filter(hv > hvthresh)
+dfbs
+```
+Let's remove the outlier and rerun the regression.
+
+```{r}
+rns <- rownames(dfbs)
+mtcars <- mtcars[!(row.names(mtcars) %in% rns),]
+fit <- lm(mpg ~ fam + disp + hp + drat + wt + fvs + gear, data = mtcars)
+```
+
+# Final Results
+
+Now that we have selected a model, removed outliers, and performed the 
+regression let's take a look at the model.
+
+```{r}
+summary(fit)$coefficients
+```
+According to this summary, our model has an adjusted $R^2$ of $0.81$. Based on 
+this, our model appears to do a good job predicting mpg. Additionally, our 
+model predicts that switch from automatic transmission to manual transmission 
+will result in a 1.84 mpg increase. However, with a standard error of 1.934 and 
+a t value of 0.953, this value is not statistically significant. Therefore we 
+cannot say that there is a statistical difference in the mpgs of manual vs 
+automatic transmissions.
+
+# References
